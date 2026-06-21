@@ -102,7 +102,7 @@ function serialize(row: any): CatalogImage {
     prompt: row.prompt,
     width: row.width,
     height: row.height,
-    tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
+    tags: row.tags ?? [],
     license: row.license,
     priceCents: row.priceCents,
     createdAt:
