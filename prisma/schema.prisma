@@ -1,0 +1,173 @@
+// Prisma schema for AI Asset Studio
+// DB: Neon (Postgres). Connection via DATABASE_URL env.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// NextAuth.js models (Auth.js Prisma adapter)
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(USER)
+
+  accounts      Account[]
+  sessions      Session[]
+
+  subscription  Subscription?
+  downloads     Download[]
+  uploadedImages Image[]    @relation("ImageUploader")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Domain models
+// ---------------------------------------------------------------------------
+
+model Image {
+  id          String       @id @default(cuid())
+  title       String
+  description String?      @db.Text
+  // URL of the generated/published asset (ComfyUI output or CDN)
+  url         String
+  thumbnailUrl String?
+  prompt      String?      @db.Text
+  // generation metadata (workflow id, seed, model, etc.)
+  meta        Json?
+  width       Int          @default(1024)
+  height      Int          @default(1024)
+  tags        String[]     @default([])
+  license     LicenseType  @default(STANDARD)
+  priceCents  Int          @default(0) // one-shot purchase price; 0 = free/subscription only
+  status      ImageStatus  @default(PUBLISHED)
+  source      ImageSource  @default(COMFYUI)
+
+  uploaderId  String?
+  uploader    User?        @relation("ImageUploader", fields: [uploaderId], references: [id], onDelete: SetNull)
+
+  downloads   Download[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum ImageStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ImageSource {
+  COMFYUI
+  UPLOAD
+  N8N
+}
+
+enum LicenseType {
+  STANDARD
+  EXTENDED
+  EDITORIAL
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  userId               String             @unique
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  plan                 SubscriptionPlan   @default(FREE)
+  status               SubscriptionStatus @default(INACTIVE)
+
+  stripeCustomerId     String?            @unique
+  stripeSubscriptionId String?            @unique
+  stripePriceId        String?
+  currentPeriodEnd     DateTime?
+
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
+
+enum SubscriptionPlan {
+  FREE
+  BASIC
+  PRO
+}
+
+enum SubscriptionStatus {
+  INACTIVE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+model Download {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  imageId     String
+  image       Image       @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  license     LicenseType @default(STANDARD)
+  // purchase / checkout reference if a one-shot purchase
+  stripePaymentId String?
+
+  createdAt   DateTime    @default(now())
+
+  @@index([userId])
+  @@index([imageId])
+}
