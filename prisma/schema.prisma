@@ -1,14 +1,13 @@
 // Prisma schema for AI Asset Studio
-// DB: Neon (Postgres). Connection via DATABASE_URL env.
+// DB: MySQL. Connection via DATABASE_URL env.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +89,7 @@ model Image {
   meta        Json?
   width       Int          @default(1024)
   height      Int          @default(1024)
-  tags        String[]     @default([])
+  tags        Json         @default("[]")
   license     LicenseType  @default(STANDARD)
   priceCents  Int          @default(0) // one-shot purchase price; 0 = free/subscription only
   status      ImageStatus  @default(PUBLISHED)
